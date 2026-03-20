@@ -5,6 +5,9 @@ from helpers.config import get_settings, Settings
 from controllers import DataController, ProjectController
 import aiofiles
 from models.enums import ResponseStatus
+import logging
+
+logger = logging.getLogger("uvicorn.error")
 
 data_router = APIRouter(
     prefix="/api/v1/data",
@@ -31,11 +34,11 @@ async def upload_data(
             while chunk := await file.read(app_settings.FILE_CHUNK_SIZE):
                 await f.write(chunk)
     except Exception as e:
+        logger.error(f"Error saving file: {e}")
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={
                 "message": ResponseStatus.FILE_UPLOAD_FAILED.value,
-                "error": str(e),
             },
         )
 
