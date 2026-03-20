@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, Depends, UploadFile
 from .BaseController import BaseController
+from models.enums import ResponseStatus
 
 
 class DataController(BaseController):
@@ -11,9 +12,9 @@ class DataController(BaseController):
     def validate_uploaded_file(self, file: UploadFile):
 
         if file.content_type not in self.app_settings.FILE_ALLOWED_TYPES:
-            return False
+            return False, ResponseStatus.ERROR_Invalid_File_Type.value
         if (
             file.size > self.app_settings.FILE_MAX_SIZE_MB * self.size_scale
         ):  # file size in bytes
-            return False
-        return True
+            return False, ResponseStatus.ERROR_File_Size_Exceeded.value
+        return True, ResponseStatus.SUCCESS.value

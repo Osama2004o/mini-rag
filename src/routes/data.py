@@ -13,5 +13,7 @@ data_router = APIRouter(
 async def upload_data(
     project_id: str, file: UploadFile, app_settings: Settings = Depends(get_settings)
 ):
-    is_valid = DataController().validate_uploaded_file(file=file)
-    return is_valid
+    is_valid, response_message = DataController().validate_uploaded_file(file=file)
+    return {
+        "status": response_message,
+    }
