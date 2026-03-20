@@ -26,9 +26,15 @@ async def upload_data(
     project_dir_path = ProjectController().get_project_path(project_id=project_id)
     file_path = os.path.join(project_dir_path, file.filename)
 
-    async with aiofiles.open(file_path, "wb") as f:
-        while chunk := await file.read(app_settings.FILE_CHUNK_SIZE):
-            await f.write(chunk)
+    try:
+        async with aiofiles.open(file_path, "wb") as f:
+            while chunk := await file.read(app_settings.FILE_CHUNK_SIZE):
+                await f.write(chunk)
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Error occurred while uploading file"},
+        )
 
     return JSONResponse(
         content={"message": ResponseStatus.FILE_UPLOADED_SUCCESSFULLY.value},
