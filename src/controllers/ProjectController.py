@@ -1,5 +1,5 @@
 from fastapi import UploadFile
-from models import ResponseStatus
+from models import ResponseSignal
 from .BaseController import BaseController
 import os
 
