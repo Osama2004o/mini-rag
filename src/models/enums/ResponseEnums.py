@@ -7,3 +7,5 @@ class ResponseSignal(Enum):
     ERROR_Invalid_File_Type = "error_invalid_file_type"
     FILE_UPLOADED_SUCCESSFULLY = "file_uploaded_successfully"
     FILE_UPLOAD_FAILED = "file_upload_failed"
+    PROCESSING_SUCCESS = "processing_successful"
+    PROCESSING_FAILED = "processing_failed"
