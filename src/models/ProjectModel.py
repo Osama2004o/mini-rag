@@ -23,3 +23,23 @@ class ProjectModel(BaseDataModel):
             return project
         else:
             return Project(**record)
+
+    async def get_all_projects(self, page: int=1, page_size: int=10):
+        
+        #cound total documents
+        total_documents = await self.collection.count_documents({})
+        total_pages = total_documents // page_size + (1 if total_documents % page_size > 0 else 0)
+        
+        # fetch paginated results
+        cursor = self.collection.find().skip((page - 1) * page_size).limit(page_size)
+        # you can use this to list all 
+        documents = list(cursor)
+        # you can use this for async iteration
+
+        projects = []
+        async for document in cursor:
+            projects.append(
+                Project(**document)
+            )
+        return projects, total_pages
+        
