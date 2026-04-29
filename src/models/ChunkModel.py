@@ -46,7 +46,10 @@ class ChunkModel(BaseDataModel):
 
         for i in range(0, len(chunks), batch_size):
             batch = chunks[i : i + batch_size]
-            operations = [InsertOne(chunk.dict()) for chunk in batch]
+            operations = [
+                InsertOne(chunk.dict(by_alias=True, exclude_unset=True))
+                for chunk in batch
+            ]
 
             await self.collection.bulk_write(operations)
 
