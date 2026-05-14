@@ -1,20 +1,19 @@
 from LLMInterface import LLMInterface
-from LLMEnums import OpenAiEnums
-from openai import OpenAI
+from LLMEnums import CoHereEnums
+import cohere
 import logging
 
 
-class OpenAiProvider(LLMInterface):
+class CoHereProvider(LLMInterface):
+
     def __init__(
         self,
         api_key: str,
-        api_url: str = None,
         default_input_max_characters: int = 1000,
         default_output_max_characters: int = 1000,
         default_generation_temperature: float = 0.1,
     ):
         self.api_key = api_key
-        self.api_url = api_url
         self.default_input_max_characters = default_input_max_characters
         self.default_output_max_characters = default_output_max_characters
         self.default_generation_temperature = default_generation_temperature
@@ -24,8 +23,7 @@ class OpenAiProvider(LLMInterface):
         self.embedding_model_id = None
         self.embedding_size = None
 
-        self.client = OpenAI(api_key=self.api_key, base_url=self.api_url)
-
+        self.client = cohere.Client(api_key=self.api_key)
         self.logger = logging.getLogger(__name__)
 
     def set_generation_model(self, model_id: str):
@@ -46,63 +44,56 @@ class OpenAiProvider(LLMInterface):
         temperature: float = None,
     ):
         if not self.client:
-            self.logger.error("OpenAi Client not initialized")
+            self.logger.error("CoHere Client not initialized")
+            return None
+        if not self.generatino_model_id:
+            self.logger.error("Generation model for CoHere not set")
             return None
 
-        if not self.generatino_model_id:
-            self.logger.error("Generation model for OpenAi not set")
-            return None
         max_output_token = max_output_token or self.default_output_max_characters
         temperature = temperature or self.default_generation_temperature
-        chat_history.append(
-            self.construct_prompt(
-                prompt=prompt,
-                role=OpenAiEnums.USER.value,
-            )
-        )
-        response = self.client.chat.completions.create(
+
+        response = self.client.chat(
             model=self.generatino_model_id,
-            messages=chat_history,
-            max_tokens=max_output_token,
+            chat_history=chat_history,
+            message=self.process_text(prompt),
             temperature=temperature,
+            max_tokens=max_output_token,
         )
-        if (
-            not response
-            or not response.choices
-            or len(response.choices) == 0
-            or not response.choices[0].message
-        ):
-            self.logger.error("Error while generating text with OpenAi")
+        if not response or not response.text:
+            self.logger.error("Error while generating text with CoHere")
             return None
 
-        return response.choices[0].message["content"]
+        return response
 
     def embed_text(self, text: str, document_type: str = None):
         if not self.client:
-            self.logger.error("OpenAi Client not initialized")
+            self.logger.error("CoHere Client not initialized")
             return None
-
         if not self.embedding_model_id:
-            self.logger.error("Embedding model for OpenAi not set")
+            self.logger.error("Embedding model for CoHere not set")
             return None
 
-        response = self.client.embeddings.create(
+        input_type = CoHereEnums.DOCUMENT.value
+        if document_type == CoHereEnums.QUERY.value:
+            input_type = CoHereEnums.QUERY.value
+        
+        response = self.client.embed(
             model=self.embedding_model_id,
-            input=text,
+            texts=[text],
+            input_type=input_type,
         )
-        if (
-            not response
-            or not response.data
-            or len(response.data) == 0
-            or not response.data[0].embedding
-        ):
-            self.logger.error("Error while embedding text with OpenAi")
+
+        if not response or not response.embeddings or not response.embeddings.float:
+            self.logger.error("Error while embedding text with CoHere")
             return None
 
-        return response.data[0].embedding
+        return response.embeddings.float[0]
+        
+    
 
     def construct_prompt(self, prompt: str, role: str):
         return {
             "role": role,
-            "content": self.process_text(prompt),
+            "text": self.process_text(prompt),
         }
