@@ -10,12 +10,12 @@ class CoHereProvider(LLMInterface):
         self,
         api_key: str,
         default_input_max_characters: int = 1000,
-        default_output_max_characters: int = 1000,
+        default_generation_max_output_tokens: int = 1000,
         default_generation_temperature: float = 0.1,
     ):
         self.api_key = api_key
         self.default_input_max_characters = default_input_max_characters
-        self.default_output_max_characters = default_output_max_characters
+        self.default_output_max_characters = default_generation_max_output_tokens
         self.default_generation_temperature = default_generation_temperature
 
         self.generation_model_id = None
@@ -77,7 +77,7 @@ class CoHereProvider(LLMInterface):
         input_type = CoHereEnums.DOCUMENT.value
         if document_type == CoHereEnums.QUERY.value:
             input_type = CoHereEnums.QUERY.value
-        
+
         response = self.client.embed(
             model=self.embedding_model_id,
             texts=[text],
@@ -89,8 +89,6 @@ class CoHereProvider(LLMInterface):
             return None
 
         return response.embeddings.float[0]
-        
-    
 
     def construct_prompt(self, prompt: str, role: str):
         return {
