@@ -53,6 +53,31 @@ class QdrantDBProvider(VectorDBInterface):
                 ),
             )
             return True
+        else:
+            # Check if the existing collection has the correct size
+            collection_info = self.client.get_collection(collection_name=collection_name)
+            
+            # Extract current size depending on how vectors are configured
+            current_size = 0
+            if hasattr(collection_info.config.params.vectors, 'size'):
+                current_size = collection_info.config.params.vectors.size
+            elif isinstance(collection_info.config.params.vectors, dict) and "" in collection_info.config.params.vectors:
+                current_size = collection_info.config.params.vectors[""].size
+            
+            if current_size > 0 and current_size != embedding_size:
+                self.logger.warning(
+                    f"Collection '{collection_name}' has size {current_size} but expected {embedding_size}. Recreating."
+                )
+                self.delete_collection(collection_name)
+                self.client.create_collection(
+                    collection_name=collection_name,
+                    vectors_config=models.VectorParams(
+                        size=embedding_size,
+                        distance=self.distance_method,
+                    ),
+                )
+                return True
+
         return False
 
     def insert_one(
@@ -68,16 +93,23 @@ class QdrantDBProvider(VectorDBInterface):
                 f"cannot insert new record to non-existing collection: {collection_name}"
             )
             return False
-        _ = self.client.upload_records(
+
+        # If no ID provided, you can use a random UUID or pass an integer
+        if record_id is None:
+            import uuid
+
+            record_id = str(uuid.uuid4())
+
+        self.client.upload_points(
             collection_name=collection_name,
-            records=[
-                models.Record(
+            points=[
+                models.PointStruct(
+                    id=record_id,  # Must be a string (UUID) or integer, not a list
                     vector=vector,
                     payload={
                         "text": text,
                         "metadata": metadata,
                     },
-                    id=record_id,
                 )
             ],
         )
@@ -102,37 +134,44 @@ class QdrantDBProvider(VectorDBInterface):
             metadatas = [None] * len(texts)
 
         if record_ids is None:
-            record_ids = [None] * len(texts)
+            record_ids = list(range(0, len(texts)))
 
         for i in range(0, len(texts), batch_size):
             batch_end = i + batch_size
             batch_texts = texts[i:batch_end]
             batch_vectors = vectors[i:batch_end]
             batch_metadatas = metadatas[i:batch_end]
+            batch_record_ids = record_ids[i:batch_end]
 
-            batch_records = [
-                models.Record(
+            # Use models.PointStruct instead of models.Record
+            batch_points = [
+                models.PointStruct(
+                    id=batch_record_ids[j],
                     vector=batch_vectors[j],
                     payload={
                         "text": batch_texts[j],
                         "metadata": batch_metadatas[j],
                     },
-                    id=record_ids[j],
                 )
                 for j in range(len(batch_texts))
             ]
-        try:
-            _ = self.client.upload_records(
-                collection_name=collection_name,
-                records=batch_records,
-            )
-        except Exception as e:
-            self.logger.error(f"error while inserting batch {e}")
+
+            # Indented correctly inside the loop
+            try:
+                self.client.upload_points(
+                    collection_name=collection_name,
+                    points=batch_points,  # Changed parameter name to points
+                )
+            except Exception as e:
+                self.logger.error(f"error while inserting batch {e}")
+                return False
+
         return True
 
     def search_by_vector(self, collection_name: str, vector: list, limit: int = 5):
-        return self.client.search(
+        response = self.client.query_points(
             collection_name=collection_name,
-            query_vector=vector,
+            query=vector,
             limit=limit,
         )
+        return response.points
